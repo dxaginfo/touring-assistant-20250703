@@ -1,0 +1,363 @@
+// This is your Prisma schema file
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  role          UserRole
+  phoneNumber   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  createdTours  Tour[]    @relation("TourCreator")
+  tourMembers   TourMember[]
+  expenses      Expense[]
+  documents     Document[] @relation("DocumentUploader")
+  equipmentOwned Equipment[] @relation("EquipmentOwner")
+  notifications Notification[]
+}
+
+enum UserRole {
+  ADMIN
+  TOUR_MANAGER
+  BAND_MEMBER
+  CREW
+}
+
+model Tour {
+  id            String    @id @default(uuid())
+  name          String
+  description   String?
+  startDate     DateTime
+  endDate       DateTime
+  createdById   String
+  status        TourStatus
+  budgetTotal   Float?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  createdBy     User      @relation("TourCreator", fields: [createdById], references: [id])
+  members       TourMember[]
+  events        Event[]
+  transportation Transportation[]
+  accommodations Accommodation[]
+  tourEquipment TourEquipment[]
+  itineraries   Itinerary[]
+  expenses      Expense[]
+  income        Income[]
+  documents     Document[]
+  notifications Notification[]
+}
+
+enum TourStatus {
+  PLANNING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model TourMember {
+  id              String    @id @default(uuid())
+  tourId          String
+  userId          String
+  role            String
+  invitationStatus InvitationStatus
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  tour            Tour      @relation(fields: [tourId], references: [id])
+  user            User      @relation(fields: [userId], references: [id])
+
+  @@unique([tourId, userId])
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+model Venue {
+  id              String    @id @default(uuid())
+  name            String
+  address         String
+  city            String
+  state           String?
+  country         String
+  postalCode      String?
+  capacity        Int?
+  contactName     String?
+  contactEmail    String?
+  contactPhone    String?
+  website         String?
+  notes           String?
+  technicalSpecs  String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  events          Event[]
+}
+
+model Event {
+  id              String    @id @default(uuid())
+  tourId          String
+  venueId         String?
+  name            String
+  eventType       EventType
+  startDatetime   DateTime
+  endDatetime     DateTime
+  description     String?
+  status          EventStatus
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  tour            Tour      @relation(fields: [tourId], references: [id])
+  venue           Venue?    @relation(fields: [venueId], references: [id])
+  show            Show?
+  itineraryItems  ItineraryItem[]
+  departingTransportation Transportation[] @relation("DepartureEvent")
+  arrivingTransportation Transportation[] @relation("ArrivalEvent")
+}
+
+enum EventType {
+  SHOW
+  TRAVEL
+  ACCOMMODATION
+  MEDIA
+  OTHER
+}
+
+enum EventStatus {
+  TENTATIVE
+  CONFIRMED
+  CANCELLED
+}
+
+model Show {
+  id              String    @id @default(uuid())
+  eventId         String    @unique
+  ticketPrice     Float?
+  ticketUrl       String?
+  doorsTime       DateTime?
+  soundcheckTime  DateTime?
+  setDuration     Int?       // in minutes
+  supportActs     String?
+  merchSetup      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  event           Event     @relation(fields: [eventId], references: [id])
+  income          Income[]
+}
+
+model Transportation {
+  id                String    @id @default(uuid())
+  tourId            String
+  startEventId      String
+  endEventId        String
+  transportType     TransportType
+  provider          String?
+  confirmationNumber String?
+  departureDatetime DateTime
+  arrivalDatetime   DateTime
+  notes             String?
+  cost              Float?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  tour              Tour      @relation(fields: [tourId], references: [id])
+  startEvent        Event     @relation("DepartureEvent", fields: [startEventId], references: [id])
+  endEvent          Event     @relation("ArrivalEvent", fields: [endEventId], references: [id])
+}
+
+enum TransportType {
+  VAN
+  BUS
+  FLIGHT
+  TRAIN
+  OTHER
+}
+
+model Accommodation {
+  id                String    @id @default(uuid())
+  tourId            String
+  city              String
+  name              String
+  address           String
+  checkInDate       DateTime
+  checkOutDate      DateTime
+  confirmationNumber String?
+  contactInfo       String?
+  cost              Float?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  tour              Tour      @relation(fields: [tourId], references: [id])
+}
+
+model Equipment {
+  id                String    @id @default(uuid())
+  name              String
+  category          String
+  description       String?
+  ownerId           String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  owner             User?     @relation("EquipmentOwner", fields: [ownerId], references: [id])
+  tourEquipment     TourEquipment[]
+}
+
+model TourEquipment {
+  id                String    @id @default(uuid())
+  tourId            String
+  equipmentId       String
+  source            EquipmentSource
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  tour              Tour      @relation(fields: [tourId], references: [id])
+  equipment         Equipment @relation(fields: [equipmentId], references: [id])
+  
+  @@unique([tourId, equipmentId])
+}
+
+enum EquipmentSource {
+  BRINGING
+  RENTING
+  VENUE_PROVIDED
+}
+
+model Itinerary {
+  id                String    @id @default(uuid())
+  tourId            String
+  date              DateTime
+  generatedAt       DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  tour              Tour      @relation(fields: [tourId], references: [id])
+  items             ItineraryItem[]
+  
+  @@unique([tourId, date])
+}
+
+model ItineraryItem {
+  id                String    @id @default(uuid())
+  itineraryId       String
+  eventId           String?
+  startTime         DateTime
+  endTime           DateTime
+  description       String
+  location          String?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  itinerary         Itinerary @relation(fields: [itineraryId], references: [id])
+  event             Event?    @relation(fields: [eventId], references: [id])
+}
+
+model Expense {
+  id                String    @id @default(uuid())
+  tourId            String
+  amount            Float
+  category          String
+  description       String?
+  date              DateTime
+  paidById          String
+  receiptUrl        String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  tour              Tour      @relation(fields: [tourId], references: [id])
+  paidBy            User      @relation(fields: [paidById], references: [id])
+}
+
+model Income {
+  id                String    @id @default(uuid())
+  tourId            String
+  showId            String?
+  amount            Float
+  source            IncomeSource
+  date              DateTime
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  tour              Tour      @relation(fields: [tourId], references: [id])
+  show              Show?     @relation(fields: [showId], references: [id])
+}
+
+enum IncomeSource {
+  TICKET_SALES
+  MERCH
+  SPONSORSHIP
+  OTHER
+}
+
+model Document {
+  id                String    @id @default(uuid())
+  tourId            String
+  name              String
+  type              DocumentType
+  fileUrl           String
+  uploadedById      String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  tour              Tour      @relation(fields: [tourId], references: [id])
+  uploadedBy        User      @relation("DocumentUploader", fields: [uploadedById], references: [id])
+}
+
+enum DocumentType {
+  CONTRACT
+  RIDER
+  INVOICE
+  OTHER
+}
+
+model Notification {
+  id                String    @id @default(uuid())
+  userId            String
+  tourId            String?
+  title             String
+  message           String
+  read              Boolean   @default(false)
+  notificationType  String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  user              User      @relation(fields: [userId], references: [id])
+  tour              Tour?     @relation(fields: [tourId], references: [id])
+}
